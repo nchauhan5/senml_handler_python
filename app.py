@@ -8,8 +8,8 @@ app = Flask(__name__)
 @app.route('/senml/api/v1.0/send', methods=['POST'])
 def post_senml_message():
     converted_message_dict = OrderedDict()
-    senml_message = request.json
-
+    senml_message = request.get_json()
+    print(senml_message)
     sensor_header = senml_message[0]
     base_version = sensor_header['bver']
     base_number = sensor_header['bn'][12:].split('_')
