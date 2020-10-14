@@ -1,6 +1,12 @@
 from flask import Flask, jsonify, request, Response
 from collections import OrderedDict
 import json
+from azure.eventhub import EventHubProducerClient, EventData
+import datetime
+
+EVENTHUBCONNECTIONSTRING = "Endpoint=sb://sensor-partner-eh-namespace-63et4.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=xCqkPnpUo2wyuahem2jHnacc/cPkGlm0Ptu4+wnyFwg="
+EVENTHUBNAME = "sensor-partner-eh-00"
+client = EventHubProducerClient.from_connection_string(EVENTHUBCONNECTIONSTRING, eventhub_name=EVENTHUBNAME)
 
 app = Flask(__name__)
 
@@ -38,6 +44,31 @@ def post_senml_message():
     converted_message_dict['measurement']['soil_moisture_content'] = sensor_reading['v']
     converted_message_dict['measurement']['soil_depth'] = sensor_reading['depth']
     converted_message_dict['measurement']['soil_type'] = sensor_reading['soil']
+    current_time_iso = datetime.datetime.now().isoformat()
+    telemetry = {
+        "deviceid": "500244ee-2fd0-40eb-bb80-10ff19c4aeea",
+        "timestamp": current_time_iso,
+        "version": "1",
+        "sensors": [
+            {
+                "id": "8555eeb3-a550-4e75-a1b3-f77602842330",
+                "sensordata": [
+                    {
+                        "timestamp": current_time_iso,
+                        "Volumetric Water Content (%)": converted_message_dict['measurement']['soil_moisture_content']
+                    }
+                ]
+            }
+        ]
+    }
+    event_data_batch = client.create_batch()
+    try:
+        event_data = EventData(json.dumps(telemetry))
+        print(event_data)
+        event_data_batch.add(event_data)
+    except:  # EventDataBatch object reaches max_size.
+        Response(json.dumps({"message": "Error with eventhub"}, default=str), status=500, mimetype='application/json')
+    client.send_batch(event_data_batch)
 
     return Response(json.dumps(converted_message_dict, default=str), status=200, mimetype='application/json')
 
